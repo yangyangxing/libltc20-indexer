@@ -12,6 +12,21 @@ dotenv_path = '../Config/.env'
 load_dotenv(dotenv_path)
 
 
+#Snapshot: 
+
+#Block height applied: 2477915
+
+#Data (Sender, Receiver, Amount)
+
+#5b4a4d4b9e64258ef438b5cb446434f3694f360fa0047bb819832ae1c0e86317
+
+#3fc9cf92d1aad70702d54a89defd7abd54a5d3d414133e3bbf45f11011fb15a0
+
+#Snapshot: 
+
+#963f6f8febd29a2251d52801c4270f88b968db554d5676194c4f78ca1ce79c24
+
+
 if __name__=='__main__':
     # use which full-node and ord server. 
     # If you have your own server, change it to 
