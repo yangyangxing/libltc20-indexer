@@ -32,12 +32,10 @@ if __name__=='__main__':
     # If you have your own server, change it to 
     url_base = 'https://ordinalslite.com'
 
-    #the mode.
-    # if mode==UPDATE_BLK_BY_BLK. It can be slow but it is easy for you to understand how indexer works
-    # if mode==FAST_CATCHUP, then you need download all tx_pairs and all inscription history first
+    #如果还没有同步过区块就选UPDATE_BLK_BY_BLK（逐块更新），如果之前同步过就选FAST_CATCHUP（快速追赶）会从下面设置的高度继续逐块更新
     mode = 'UPDATE_BLK_BY_BLK'
 
-    # you need change the biggest height in the database in the fast catchup setting
+    # 快速追赶的高度设置
     fast_catchup_target_height = 2467872
 
     #backup tables parameters
@@ -50,21 +48,22 @@ if __name__=='__main__':
     ------------------------------------------------------------------
     ------------------------------------------------------------------'''
     #init the db
-    # we start from the first ltc20 inscription.
+    # 设置最初索引区块，并以此初始化数据库
     ele = {'last_ins_num': 224060, 'last_height': 2465225}
+    #初始化数据库
     init_idx_database(ele)
 
-    # build a connetion with the db
+    # 链接初始化后的数据库
     db_manager = generate_a_db_manager()
     db_name = os.getenv('DB_NAME')
     db_manager.connect_with_postgres(db_name)
 
-    #snapshot details:
+    #导入安东尼快照:
     snapshots_file = os.getenv('SP_FILE')
     with open(snapshots_file, 'r') as file:
         snapshots_details = yaml.safe_load(file)
     
-    # get the last_in_num and last_height in the db
+    # 获取数据库索引中现在索引到的高度
     row = db_manager.search_a_table_with_constraints(db_manager.conn, 'misc', {'id': 1})
     last_ins_num = row[0][1]
     last_height = row[0][2]
@@ -72,19 +71,18 @@ if __name__=='__main__':
     print('The last height in the db (included) is {}.'.format(last_height))
 
 
-    # get current height and current ins_num in the blockchain
+    # 获取目前的最近区块高度和索引号
     current_height = get_current_height(url_base)
     current_ins_num = get_current_ins_num(url_base)
     print('The current height and ins_num is {} and {}.'.format(current_height, current_ins_num))
 
-    #for any mode, we download snapshots first 
-    # so even for UPDATE_BLK_BY_BLK we do not need to download snapshots transfer anymore.
+    #下载快照并存储在数据库
     get_snapshots_data_until_target_height_seq(url_base, db_manager, snapshots_details, True, None)
 
-    # ok. let start to catch up with these
+    # 如果是快速追赶模式
     if mode == 'FAST_CATCHUP':
         if fast_catchup_target_height < last_height:
-            #the database is not ok. switch to UPDATE_BLK_BY_BLK mode
+            #数据库数据不完整继续逐块更新
             print('*****BE CAREFUL**** we set the mode as UPDATE_BLK_BY_BLK')
             mode == 'UPDATE_BLK_BY_BLK'
         else:

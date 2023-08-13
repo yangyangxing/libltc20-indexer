@@ -49,7 +49,7 @@ def get_content(url, api=False):
         response = requests.get(url)
         data = response.text
     return data
-
+#通过铭文编号获取铭文列表url
 def get_all_ins_list_in_a_page(url_base, last):
     url = url_base + '/inscriptions/' + str(last)
     inscriptions = get_content(url, True)['inscriptions']
@@ -57,7 +57,7 @@ def get_all_ins_list_in_a_page(url_base, last):
     urls = [url_base + inscription['href'] for inscription in inscriptions]
 
     return urls
-
+#通过url获取铭文详情：详情、编号、高度
 def get_details_of_an_ins(url):
     headers = {'Accept': 'application/json'}
     response = requests.get(url, headers=headers)
@@ -204,7 +204,7 @@ def type_deciper(inp):
     return type_x, num
     
 
-
+#通过content url获取content内容
 def get_content_of_an_ins(url_base, url_content):
     headers = {'Accept': 'application/json'}
     response = requests.get(url_base + url_content['content_href'], headers=headers)
@@ -223,13 +223,14 @@ def get_content_of_an_ins(url_base, url_content):
         json_content['p'] = 'unknown'
     
     return json_content
-
+#获取output的详细信息
 def get_details_of_an_ouput(url_base, tx_id, vout, api=True):
     url = url_base + '/output/' + tx_id + ':' + str(vout)
     data = get_content(url, api=api)
     
     return data
 
+#通过snapshot_id get请求获取所有快照信息：发送者、接受者、数量
 def get_snapshot(url_base, db_manager, snapshot_num, snapshot_id, height, time_inscribed, tick):
     headers = {'Accept': 'application/json'}
     response = requests.get(url_base + '/content/' + snapshot_id, headers = headers)

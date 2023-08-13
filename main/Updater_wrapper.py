@@ -36,7 +36,7 @@ def get_snapshots_data_until_target_height_seq(url_base, db_manager, snapshots_d
             tick = snapshots_details['ins_tick'][i]
 
             snapshot_items = get_snapshot(url_base, db_manager, ins_num, ins_id, h, '', tick)
-        
+    #直接执行这个 通过yml中的配置拉取快照信息   
     else:
         num_snapshot = len(snapshots_details['ins_id'])
         for i in range(num_snapshot):
@@ -47,7 +47,7 @@ def get_snapshots_data_until_target_height_seq(url_base, db_manager, snapshots_d
 
             snapshot_itemp = get_snapshot(url_base, db_manager, ins_num, ins_id, h, '', tick)
             snapshot_items = snapshot_items + snapshot_itemp
-
+    #将拉取的快照遍历一遍数据库，没有就存进去，存了就跳过
     for s in snapshot_items:
         constraints = {'ins_id': s['ins_id']} 
         row = db_manager.search_a_table_with_constraints(db_manager.conn, 'ltc20_ins_list', constraints)
@@ -57,6 +57,7 @@ def get_snapshots_data_until_target_height_seq(url_base, db_manager, snapshots_d
             print('Already insert the snapshot item')
     print('Total item in this snapshot: {}'.format(len(snapshot_items)))
 
+#
 def get_ins_data_until_target_height_all_seq(url_base, db_manager, last_ins_num, 
                                                 last_height, target_height):
     #download normal ins
@@ -67,10 +68,11 @@ def get_ins_data_until_target_height_all_seq(url_base, db_manager, last_ins_num,
         last = start + 100 - 1
         urls_content = []
         ltc20_ins_items = []
-    
+        #通过数据库最新铭文编号获取铭文列表url
         urls = get_all_ins_list_in_a_page(url_base, last)
         for ii in tqdm(range(len(urls)), desc='ins'):
             url = urls[ii]
+            #通过铭文url获取铭文详细信息
             url_content, ins_num, genesis_height = get_details_of_an_ins(url)
 
             if url_content != None:
