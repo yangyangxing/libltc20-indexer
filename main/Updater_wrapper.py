@@ -11,8 +11,8 @@ sys.path.append(path_cst)
 from DB_init import *
 from OL_Base import *
 
-def get_txpairs_until_target_height_seq(url_base, db_manager, last_height, 
-                                                        target_height):
+#查询指定高度的所有交易对并将未归纳交易对存储在数据库
+def get_txpairs_until_target_height_seq(url_base, db_manager, last_height, target_height):
     for height in tqdm(range(last_height + 1, target_height + 1), desc='txpairing'):
         #get the txpairs and save them into the database
         dict_txpairs = get_txpairs_at_a_height(url_base, height)
@@ -57,7 +57,7 @@ def get_snapshots_data_until_target_height_seq(url_base, db_manager, snapshots_d
             print('Already insert the snapshot item')
     print('Total item in this snapshot: {}'.format(len(snapshot_items)))
 
-#
+#通过数据库最新铭文编号查询铭文列表，并将未归纳铭文详情存储到数据库中
 def get_ins_data_until_target_height_all_seq(url_base, db_manager, last_ins_num, 
                                                 last_height, target_height):
     #download normal ins
@@ -78,6 +78,7 @@ def get_ins_data_until_target_height_all_seq(url_base, db_manager, last_ins_num,
             if url_content != None:
                 if genesis_height > last_height and genesis_height <= target_height:
                     page_item = get_ltc20_details_of_an_ins(url_base, url_content)
+                    #判断返回数据是否是字典类型，然后将url和铭文详情归纳
                     if type(page_item)== dict:
                         if type(page_item['data'])==dict:
                             urls_content.append(url_content)
@@ -105,7 +106,7 @@ def get_ins_data_until_target_height_all_seq(url_base, db_manager, last_ins_num,
             offset = data['offset']
             value = data['genesis_value']
 
-            #since we will modify ins_id for snapshot, THIS is the only unique key we will use
+            #通过ins_id遍历数据库如果查询不到进行数据存储
             constraints = {'ins_id': data['ins_id']} 
             row = db_manager.search_a_table_with_constraints(db_manager.conn, 'ltc20_ins_list', constraints)
             if len(row)>0:

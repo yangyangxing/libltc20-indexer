@@ -90,7 +90,7 @@ def get_details_of_an_ins(url):
     
     return url_content, ins_num, genesis_height
 
-
+#分析铭文详细信息根据deploy、mint、transfer返回不同数据
 def get_ltc20_details_of_an_ins(url_base, url_content):
     json_content = get_content_of_an_ins(url_base, url_content)
 
@@ -104,6 +104,7 @@ def get_ltc20_details_of_an_ins(url_base, url_content):
         time_inscribed = url_content['timestamp']
         address = url_content['address']
 
+        #获取output的详细数据：接受地址、价值
         res = get_details_of_an_ouput(url_base, tx_id, vout, True)
         if type(res)==dict:
             genesis_address = res['address']
@@ -251,6 +252,7 @@ def get_snapshot(url_base, db_manager, snapshot_num, snapshot_id, height, time_i
         snapshot_items.append(ele)
     return snapshot_items
 
+#获取指定高度的所有交易信息：高度、所有交易对、所有交易hash
 def get_txpairs_at_a_height(url_base, height):
     item = []
     all_tx_hash = get_all_tx_at_a_height(url_base, height)
@@ -266,6 +268,7 @@ def get_txpairs_at_a_height(url_base, height):
 '''
 get all tx at a height
 '''
+#获取指定高度的所有交易hash
 def get_all_tx_at_a_height(url_base, height):
 
     url_c = url_base + '/block/' + str(height)
@@ -294,6 +297,7 @@ def get_all_tx_at_a_height(url_base, height):
         print('something is not right... in block {} for getting tx'.format(height))
         return []
 
+#
 def get_sat_alignment_of_a_tx(url_base, tx_id, height):
     data = get_details_of_a_tx(url_base, tx_id)
         

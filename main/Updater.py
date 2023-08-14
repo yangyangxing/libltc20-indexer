@@ -87,8 +87,10 @@ if __name__=='__main__':
             mode == 'UPDATE_BLK_BY_BLK'
         else:
             #download data. #we will only modify ltc20_ins_list and utxo_spent_list
+            #通过数据库最新铭文编号查询铭文列表，并将未归纳铭文详情存储到数据库中
             get_ins_data_until_target_height_all_seq(url_base, db_manager, last_ins_num, 
                                                         last_height, fast_catchup_target_height) 
+            #查询指定高度的所有交易对并将未归纳交易对存储在数据库
             get_txpairs_until_target_height_seq(url_base, db_manager, last_height, 
                                                         fast_catchup_target_height)
 
@@ -98,13 +100,11 @@ if __name__=='__main__':
     while continue_flag:
         ss = time.time()
 
-        #if the fast catchup already exhaust all data. Then stop
-        #for update you need swith from the fast catchup mode to update blk by blk mode.
+        #依据数据库区块高度切换模式
         if last_height > fast_catchup_target_height and mode == 'FAST_CATCHUP':
             mode = 'UPDATE_BLK_BY_BLK'
         
-        #update the current height
-        #if there is no new height, wait for the new height..
+        #更新最新高度，如果相差为0一直等待
         current_height = get_current_height(url_base)
         remain = current_height - last_height
         while remain == 0:
@@ -121,11 +121,14 @@ if __name__=='__main__':
 
         # get ranked tx in this block
         # ranked tx includes both the paired input/output spent AND the newly inscribed inscription
+        # 获取该区块中交易的排名
+        # 排名 tx 包括花费的成对输入/输出和新刻入的铭文
         all_tx_value, last_ins_num_block = get_ranked_txpair_and_ins_at_a_height(url_base, db_manager, height, snapshots_details, last_ins_num, mode)
         print(all_tx_value)
         print(last_ins_num_block)
 
         # modify the balance according to the ranked tx
+        # 根据排名的tx修改余额
         for a in all_tx_value:
             if a[3]['type']=='ins':
                 modify_balance_by_new_inscribed_inscription(db_manager, a[3]['data'])
@@ -138,6 +141,7 @@ if __name__=='__main__':
         blk_num = blk_num + 1
 
         # update the current position
+        # 更新最新的数据库铭文编号和高度
         ele = {'last_ins_num': last_ins_num, 'last_height': last_height}
         row = db_manager.update_a_row_with_constraint(db_manager.conn, 'misc', ele, {'id': 1})
 
