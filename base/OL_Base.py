@@ -297,10 +297,12 @@ def get_all_tx_at_a_height(url_base, height):
         print('something is not right... in block {} for getting tx'.format(height))
         return []
 
-#
+#查询交易中uxto sat并对比，组成对应买入卖出对
 def get_sat_alignment_of_a_tx(url_base, tx_id, height):
+    #通过tx_id获取铭文详情
     data = get_details_of_a_tx(url_base, tx_id)
-        
+
+    #整理输入数组、输出数组  
     if type(data)==dict:
         _input_ = [data['_links']['inputs'][i]['href'].replace('/output/','') for i in range(len(data['_links']['inputs']))]
         _output_ = [data['_links']['outputs'][i]['href'].replace('/output/','') for i in range(len(data['_links']['outputs']))]
@@ -310,6 +312,7 @@ def get_sat_alignment_of_a_tx(url_base, tx_id, height):
         _output_ = []
 
     #align the sat
+    #统计输入详情和输入sat
     inp_details = []
     inp_sat = []
     for inp in _input_:
@@ -321,6 +324,7 @@ def get_sat_alignment_of_a_tx(url_base, tx_id, height):
             inp_details.append(item_c)
             inp_sat.append(sat)
 
+    #统计输出详情和输出sat
     oup_details = []
     oup_sat_start = []
     for oup in _output_:
@@ -336,6 +340,7 @@ def get_sat_alignment_of_a_tx(url_base, tx_id, height):
                 pass
 
     #start to align
+    #对比输入和输出的sat组成买入卖出对存入数据库
     tsf_pairs = []
     for i in range(len(inp_sat)):
         ii = inp_sat[i]

@@ -293,15 +293,18 @@ def get_ranked_txpair_and_ins_at_a_height(url_base, db_manager, height, snapshot
     if the mode is update blk by blk
     then we assume we get the block data directly from the json-rpc server.
     '''
+    #如果模式是逐块更新
+    #从 json-rpc 服务器获取块数据。
     if mode == 'UPDATE_BLK_BY_BLK':
-        get_ins_data_until_target_height_all_seq(url_base, db_manager, last_ins_num, 
-                                                height - 1, height)
+        get_ins_data_until_target_height_all_seq(url_base, db_manager, last_ins_num, height - 1, height)
         get_txpairs_until_target_height_seq(url_base, db_manager, height - 1, height)
 
     '''
     until this point, these two modes are aligned.
     we assume we get the block data directly from the postgres database.
     '''
+    #如果这两种模式已经对齐。
+    #直接从 postgres 数据库获取块数据。
     constraint = {'height': height}
     row_txpairs = db_manager.search_a_table_with_constraints(db_manager.conn, 'utxo_spent_list', constraint)
     all_txpairs = []
@@ -311,6 +314,7 @@ def get_ranked_txpair_and_ins_at_a_height(url_base, db_manager, height, snapshot
         all_txpairs.append(item_c)
 
     #get the ins at this height
+    #获取区块下所有铭文
     row_ins = db_manager.search_a_table_with_constraints(db_manager.conn, 'ltc20_ins_list', constraint)
     cur_ins = [row_ins[i][10] for i in range(len(row_ins))]
     if len(cur_ins)>0:
@@ -318,10 +322,12 @@ def get_ranked_txpair_and_ins_at_a_height(url_base, db_manager, height, snapshot
     else:
         last_ins_num_block = last_ins_num
 
+    #将数据库数据解析整理
     ltc20_ins_items = get_ins_items_wrapper(row_ins)
     all_txhash = get_all_tx_at_a_height(url_base, height)
 
     #ranking the txpairs, new ins snapshot using tx hash ranking
+    #对 txpairs 进行排名，使用 tx 哈希排名的新 ins 快照
     vout_max = 1
     all_tx_data = []
     for a in all_txpairs:
