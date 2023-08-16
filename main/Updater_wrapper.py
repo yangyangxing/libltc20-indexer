@@ -146,6 +146,7 @@ def get_ins_data_until_target_height_all_seq(url_base, db_manager, last_ins_num,
         print('')
         start = last + 1
 
+#更新数据库部署铭文有效性
 def update_deploy_table(item_c, db_manager):
 
     ins_num = item_c['ins_num']
@@ -183,13 +184,14 @@ def update_deploy_table(item_c, db_manager):
 
     return new_deploy
 
-
+#更新mint铭文
 def update_mint_ins(item_c, db_manager):
     tick = item_c['tick']
     amt = item_c['amt']
     ins_id = item_c['ins_id']
     ins_num = item_c['ins_num']
 
+    #查询是否有部署铭文以此判断有效性
     constraint_info = {'tick': tick}
     row = db_manager.search_a_table_with_constraints(db_manager.conn, 'ltc20_list', constraint_info)
     if len(row)==0:
@@ -199,29 +201,35 @@ def update_mint_ins(item_c, db_manager):
         db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', row_info, constraint)
         return False, 0
 
+    #根据部署铭文详情判断mint铭文有效性
     tick_lim = row[0][5]
     tick_supply = row[0][4]
     tick_minted = row[0][7]
     if (tick_lim==0 or tick_lim >= amt) and (tick_supply > tick_minted):
+        #标记开始mint铭文
         if tick_minted ==0:
             row_info = {'start_mint': ins_num, 'end_mint': 0}
             constraint_info = {'tick': tick}
             db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_list', row_info, constraint_info)
+        #标记结束mint铭文
         if tick_minted + amt >= tick_supply:
             row_info = {'end_mint': ins_num}
             constraint_info = {'tick': tick}
             db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_list', row_info, constraint_info)
 
         #modify mint balance. Partial mint is valid.
+        #计算此次有效mint值
         adjust_balance = amt
         if tick_minted + amt > tick_supply:
             adjust_balance = tick_supply - tick_minted
 
         #let's update ltc20 balance
+        #更新总mint值
         constraint_info = {'tick': tick}
         ele = {'minted': tick_minted + adjust_balance}
         db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_list', ele, constraint_info)
 
+        #更新铭文有效性
         constraint = {'ins_id': ins_id}
         row_info = {'valid': True, 'spent': True}
         db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', row_info, constraint)
@@ -347,6 +355,7 @@ def get_ranked_txpair_and_ins_at_a_height(url_base, db_manager, height, snapshot
         all_tx_data.append(tx_value)
 
     for a in all_tx_data:
+        #总排名=铭文的idxp+铭文的vout/(2*vout_max)
         total_rank = a[0] + (a[1]/(2.0*vout_max))
         a[2] = total_rank
         
@@ -354,7 +363,7 @@ def get_ranked_txpair_and_ins_at_a_height(url_base, db_manager, height, snapshot
 
     return all_tx_data_ranked, last_ins_num_block
 
-
+#依据新的铭文修改对应地址余额和地址铭文历史
 def modify_balance_by_new_inscribed_inscription(db_manager, ins_data):
     snapshot_valid = True
 
@@ -364,17 +373,20 @@ def modify_balance_by_new_inscribed_inscription(db_manager, ins_data):
     constraints = {'ins_num': data['ins_num']}
     row = db_manager.search_a_table_with_constraints(db_manager.conn, 'ltc20_ins_list', constraints)
 
+    #依据铭文类型不同处理
     if action=='deploy':
         new_deploy = update_deploy_table(data, db_manager)
     elif action=='mint':
         new_tx, mint_balance = update_mint_ins(data, db_manager)
 
         if new_tx:
+            #添加地址mint历史
             ele = {'address': data['address'], 'tick': data['tick'], 'transferable_delta': 0, 'available_delta': mint_balance, 
                     'total_delta': mint_balance, 'due_to_tx': data['tx_id'], 'due_to_ins': data['ins_id'], 'height': data['height'],
                     'action': 'mint'}
             db_manager.insert_a_row_to_a_table(db_manager.conn, 'address_tx_history', ele)
 
+            #更新地址余额
             constraint = {'address': data['address'], 'tick': data['tick']}
             row_balance = db_manager.search_a_table_with_constraints(db_manager.conn, 'address_balance', constraint)
             if len(row_balance)==0:
@@ -387,42 +399,51 @@ def modify_balance_by_new_inscribed_inscription(db_manager, ins_data):
                 db_manager.update_a_row_with_constraint(db_manager.conn, 'address_balance', ele, constraint)
 
     elif action=='transfer':
+        #依据地址余额是否为0判断转移铭文有效性并分别处理
         constraint = {'address': data['address'], 'tick': data['tick']}
         row_balance = db_manager.search_a_table_with_constraints(db_manager.conn, 'address_balance', constraint)
         constraint = {'ins_id': data['ins_id']}
         if len(row_balance)==0:
             #this transfer is not valid
+            #更新数据库铭文为无效铭文
             ele = {'valid': False, 'spent': False}
             db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', ele, constraint)
         else:
+            #依据转移数量是否小于地址余额判断转移铭文有效性并分别处理
             available = row_balance[0][4]
             if available < data['amt']:
                 ele = {'valid': False, 'spent': False}
                 db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', ele, constraint)
             else:
+                #更新铭文为有效
                 ele = {'valid': True, 'spent': False}
                 db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', ele, constraint)
 
+                #添加地址铭文历史
                 ele = {'address': data['address'], 'tick': data['tick'], 'transferable_delta': data['amt'], 
                         'available_delta': -data['amt'], 
                         'total_delta': 0, 'due_to_tx': data['tx_id'], 'due_to_ins': data['ins_id'], 'height': data['height'],
                         'action': 'inscribe-tsf'}
                 db_manager.insert_a_row_to_a_table(db_manager.conn, 'address_tx_history', ele)
 
+                #更新地址铭文余额
                 constraint = {'address': data['address'], 'tick': data['tick']}
                 row = db_manager.search_a_table_with_constraints(db_manager.conn, 'address_balance', constraint)
                 ele = {'transferable': row[0][3] + data['amt'], 'available': row[0][4] - data['amt'], 'total': row[0][5]}
                 db_manager.update_a_row_with_constraint(db_manager.conn, 'address_balance', ele, constraint)
 
+    #处理快照
     elif action=='snapshot':
         constraint = {'address': data['sender'], 'tick': data['tick']}
         row_balance = db_manager.search_a_table_with_constraints(db_manager.conn, 'address_balance', constraint)
+        #依据快照中的转移数量判断有效性并分别处理
         if len(row_balance)==0:
             #this snapshot transfer is not valid
             constraint = {'ins_id': data['ins_id']}
             ele = {'valid': False, 'spent': False}
             db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', ele, constraint)
         else:
+            #依据转移数量是否小于地址余额判断快照中的转移是否有效
             total = row_balance[0][5] #be careful here we use total in order to deal with more complex case 
             if total < data['amt']:
                 #this transfer is not valid
@@ -431,10 +452,12 @@ def modify_balance_by_new_inscribed_inscription(db_manager, ins_data):
                 db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', ele, constraint)
             else:
                 #first collect all possible unspent inscriptions
+                #查询地址所有有效铭文
                 constraint = {'receiver': data['sender'], 'valid': True, 'spent': False}
                 row_balance = db_manager.search_a_table_with_constraints(db_manager.conn, 'ltc20_ins_list', constraint)
                 
                 #set all transfer inscription under the given height as invalid in order to avoid conflict.
+                #将地址此高度下的所有转移铭文都设为无效
                 available_plus = 0
                 for r in row_balance:
                     if r[11] <= data['height']:
@@ -442,7 +465,6 @@ def modify_balance_by_new_inscribed_inscription(db_manager, ins_data):
                         ele = {'valid': False, 'spent': False}
                         db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', ele, constraint)
                         available_plus += r[9]
-                adjust_available = row_balance[0][5] - data['amt']
 
                 constraint = {'address': data['sender'], 'tick': data['tick']}
                 row_sender = db_manager.search_a_table_with_constraints(db_manager.conn, 'address_balance', constraint)
@@ -450,6 +472,7 @@ def modify_balance_by_new_inscribed_inscription(db_manager, ins_data):
                     constraint = {'ins_id': data['ins_id']}
                     ele = {'valid': False, 'spent': False}
                     db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', ele, constraint)
+                #因为外层已经判断过了，直接执行这里，地址添加快照snapshot-send
                 else:
                     ele = {'address': data['sender'], 'tick': data['tick'], 'transferable_delta': -available_plus, 
                             'available_delta': available_plus - data['amt'], 
@@ -457,9 +480,11 @@ def modify_balance_by_new_inscribed_inscription(db_manager, ins_data):
                             'action': 'snapshot-send'}
                     db_manager.insert_a_row_to_a_table(db_manager.conn, 'address_tx_history', ele)
 
+                    #更新地址余额，增加所有转移值减去快照值
                     ele = {'transferable': 0, 'available': row_sender[0][4] + available_plus - data['amt'], 'total': row_sender[0][5] - data['amt']}
                     db_manager.update_a_row_with_constraint(db_manager.conn, 'address_balance', ele, constraint)
 
+                #接受地址添加铭文记录并增加地址余额
                 constraint = {'address': data['receiver'], 'tick': data['tick']}
                 row = db_manager.search_a_table_with_constraints(db_manager.conn, 'address_balance', constraint)
                 if len(row_sender)==0:
@@ -479,6 +504,7 @@ def modify_balance_by_new_inscribed_inscription(db_manager, ins_data):
                     ele = {'valid': True, 'spent': True}
                     db_manager.update_a_row_with_constraint(db_manager.conn, 'ltc20_ins_list', ele, constraint)
 
+#
 def modify_balance_according_to_a_tx_pair(db_manager, tx_pair, snapshots_details):
     valid_spent = False
 
@@ -489,6 +515,7 @@ def modify_balance_according_to_a_tx_pair(db_manager, tx_pair, snapshots_details
     vout = output[loc+1:]
 
     # see whether this spent is due to snapshots.
+    #判断此次花费是否是快照，如果是设为无效
     for k in range(len(snapshots_details['ins_id'])):
         pt = snapshots_details['ins_id'][0]
         if ins_id.find(pt)>=0:
@@ -497,6 +524,7 @@ def modify_balance_according_to_a_tx_pair(db_manager, tx_pair, snapshots_details
             db_manager.update_a_row_with_constraint(db_manager.conn, 'utxo_spent_list', ele, constraint)
             return valid_spent
     
+    #判断转移交易对是否有效
     constraint_info = {'ins_id': ins_id}
     row = db_manager.search_a_table_with_constraints(db_manager.conn, 'ltc20_ins_list', constraint_info)
     if len(row)>0:
@@ -504,6 +532,7 @@ def modify_balance_according_to_a_tx_pair(db_manager, tx_pair, snapshots_details
         if action == 'transfer':
             valid = row[0][15]
             spent = row[0][16]
+            #有效并且没有被花费
             if valid  and not spent:
                 #we need set the utxo as spent
                 row_info = {'spent': True, 'spent_tx': spent_tx, 'spent_offset': int(vout), 

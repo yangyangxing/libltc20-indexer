@@ -122,13 +122,13 @@ if __name__=='__main__':
         # get ranked tx in this block
         # ranked tx includes both the paired input/output spent AND the newly inscribed inscription
         # 获取该区块中交易的排名
-        # 排名 tx 包括花费的成对输入/输出和新刻入的铭文
+        # 排名区块中的 tx 包括花费的成对输入/输出和新刻入的铭文
         all_tx_value, last_ins_num_block = get_ranked_txpair_and_ins_at_a_height(url_base, db_manager, height, snapshots_details, last_ins_num, mode)
         print(all_tx_value)
         print(last_ins_num_block)
 
         # modify the balance according to the ranked tx
-        # 根据排名的tx修改余额
+        # 根据排名后的tx修改余额
         for a in all_tx_value:
             if a[3]['type']=='ins':
                 modify_balance_by_new_inscribed_inscription(db_manager, a[3]['data'])
